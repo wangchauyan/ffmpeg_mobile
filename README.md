@@ -19,4 +19,5 @@ After finishing setup everything, now open the build-Android.sh. You will need t
 > 1. copy gas-preprocessor.pl to /usr/sbin, and change execute permission as 777. chmod 777 /usr/sbin/gas-preprocessor.ph
 > 2. Install yasm, brew install yasm. 
 > 3. check if yasm works. yasm --version 
-> 4. run build-iOS.sh script, it will build all versions on iOS. 
+> 4. run build-iOS.sh script, it will build all versions on iOS.
+> 5. if you wanna integrate with ffmpeg, add 3 frameworks into project, libz.lib, libbz2.lib, libiconv.lib 
