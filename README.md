@@ -16,4 +16,7 @@ After finishing setup everything, now open the build-Android.sh. You will need t
 > 2. I build on my MBPR, so I will use "darwin-x86_64", but if you use linux system, please change this to linux-x86_64. Or you will build failed. 
 
 ### iOS platform 
-
+> 1. copy gas-preprocessor.pl to /usr/sbin, and change execute permission as 777. chmod 777 /usr/sbin/gas-preprocessor.ph
+> 2. Install yasm, brew install yasm. 
+> 3. check if yasm works. yasm --version 
+> 4. run build-iOS.sh script, it will build all versions on iOS. 
