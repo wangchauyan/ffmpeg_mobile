@@ -219,6 +219,7 @@ typedef struct MatroskaTrack {
     MatroskaTrackOperation operation;
     EbmlList encodings;
     uint64_t codec_delay;
+    uint64_t codec_delay_in_track_tb;
 
     AVStream *stream;
     int64_t end_timecode;
@@ -731,6 +732,8 @@ static const EbmlSyntax matroska_clusters_incremental[] = {
 };
 
 static const char *const matroska_doctypes[] = { "matroska", "webm" };
+
+static int matroska_read_close(AVFormatContext *s);
 
 static int matroska_resync(MatroskaDemuxContext *matroska, int64_t last_pos)
 {
@@ -2239,7 +2242,7 @@ static int matroska_parse_tracks(AVFormatContext *s)
                             1000 * 1000 * 1000);    /* 64 bit pts in ns */
 
         /* convert the delay from ns to the track timebase */
-        track->codec_delay = av_rescale_q(track->codec_delay,
+        track->codec_delay_in_track_tb = av_rescale_q(track->codec_delay,
                                           (AVRational){ 1, 1000000000 },
                                           st->time_base);
 
@@ -2351,8 +2354,9 @@ static int matroska_parse_tracks(AVFormatContext *s)
                 st->need_parsing = AVSTREAM_PARSE_HEADERS;
             if (track->codec_delay > 0) {
                 st->codecpar->initial_padding = av_rescale_q(track->codec_delay,
-                                                             st->time_base,
-                                                             (AVRational){1, st->codecpar->sample_rate});
+                                                             (AVRational){1, 1000000000},
+                                                             (AVRational){1, st->codecpar->codec_id == AV_CODEC_ID_OPUS ?
+                                                                             48000 : st->codecpar->sample_rate});
             }
             if (track->seek_preroll > 0) {
                 st->codecpar->seek_preroll = av_rescale_q(track->seek_preroll,
@@ -2435,7 +2439,7 @@ static int matroska_read_header(AVFormatContext *s)
     while (res != 1) {
         res = matroska_resync(matroska, pos);
         if (res < 0)
-            return res;
+            goto fail;
         pos = avio_tell(matroska->ctx->pb);
         res = ebml_parse(matroska, matroska_segment, matroska);
     }
@@ -2454,7 +2458,7 @@ static int matroska_read_header(AVFormatContext *s)
 
     res = matroska_parse_tracks(s);
     if (res < 0)
-        return res;
+        goto fail;
 
     attachments = attachments_list->elem;
     for (j = 0; j < attachments_list->nb_elem; j++) {
@@ -2528,6 +2532,9 @@ static int matroska_read_header(AVFormatContext *s)
     matroska_convert_tags(s);
 
     return 0;
+fail:
+    matroska_read_close(s);
+    return res;
 }
 
 /*
@@ -3132,7 +3139,7 @@ static int matroska_parse_block(MatroskaDemuxContext *matroska, uint8_t *data,
 
     if (cluster_time != (uint64_t) -1 &&
         (block_time >= 0 || cluster_time >= -block_time)) {
-        timecode = cluster_time + block_time - track->codec_delay;
+        timecode = cluster_time + block_time - track->codec_delay_in_track_tb;
         if (track->type == MATROSKA_TRACK_TYPE_SUBTITLE &&
             timecode < track->end_timecode)
             is_keyframe = 0;  /* overlapping subtitles are not key frame */
@@ -3143,7 +3150,10 @@ static int matroska_parse_block(MatroskaDemuxContext *matroska, uint8_t *data,
 
     if (matroska->skip_to_keyframe &&
         track->type != MATROSKA_TRACK_TYPE_SUBTITLE) {
-        if (timecode < matroska->skip_to_timecode)
+        // Compare signed timecodes. Timecode may be negative due to codec delay
+        // offset. We don't support timestamps greater than int64_t anyway - see
+        // AVPacket's pts.
+        if ((int64_t)timecode < (int64_t)matroska->skip_to_timecode)
             return res;
         if (is_keyframe)
             matroska->skip_to_keyframe = 0;

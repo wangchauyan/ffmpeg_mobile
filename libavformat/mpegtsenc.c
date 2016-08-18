@@ -1,5 +1,5 @@
 /*
- * MPEG2 transport stream (aka DVB) muxer
+ * MPEG-2 transport stream (aka DVB) muxer
  * Copyright (c) 2003 Fabrice Bellard
  *
  * This file is part of FFmpeg.
@@ -38,6 +38,8 @@
 
 /* write DVB SI sections */
 
+#define DVB_PRIVATE_NETWORK_START 0xff01
+
 /*********************************************/
 /* mpegts section writer */
 
@@ -49,7 +51,7 @@ typedef struct MpegTSSection {
 } MpegTSSection;
 
 typedef struct MpegTSService {
-    MpegTSSection pmt; /* MPEG2 pmt table context */
+    MpegTSSection pmt; /* MPEG-2 PMT table context */
     int sid;           /* service ID */
     char *name;
     char *provider_name;
@@ -72,8 +74,8 @@ enum {
 };
 typedef struct MpegTSWrite {
     const AVClass *av_class;
-    MpegTSSection pat; /* MPEG2 pat table */
-    MpegTSSection sdt; /* MPEG2 sdt table context */
+    MpegTSSection pat; /* MPEG-2 PAT table */
+    MpegTSSection sdt; /* MPEG-2 SDT table context */
     MpegTSService **services;
     int sdt_packet_count;
     int sdt_packet_period;
@@ -353,6 +355,9 @@ static int mpegts_write_pmt(AVFormatContext *s, MpegTSService *service)
         case AV_CODEC_ID_OPUS:
             stream_type = STREAM_TYPE_PRIVATE_DATA;
             break;
+        case AV_CODEC_ID_TIMED_ID3:
+            stream_type = STREAM_TYPE_METADATA;
+            break;
         default:
             stream_type = STREAM_TYPE_PRIVATE_DATA;
             break;
@@ -605,6 +610,13 @@ static int mpegts_write_pmt(AVFormatContext *s, MpegTSService *service)
                 *q++ = 'L';
                 *q++ = 'V';
                 *q++ = 'A';
+            } else if (st->codecpar->codec_id == AV_CODEC_ID_TIMED_ID3) {
+                *q++ = 0x5; /* MPEG-2 registration descriptor */
+                *q++ = 4;
+                *q++ = 'I';
+                *q++ = 'D';
+                *q++ = '3';
+                *q++ = ' ';
             }
             break;
         }
@@ -992,7 +1004,7 @@ fail:
     return ret;
 }
 
-/* send SDT, PAT and PMT tables regulary */
+/* send SDT, PAT and PMT tables regularly */
 static void retransmit_si_info(AVFormatContext *s, int force_pat, int64_t dts)
 {
     MpegTSWrite *ts = s->priv_data;
@@ -1226,6 +1238,9 @@ static void mpegts_write_pes(AVFormatContext *s, AVStream *st,
                         st->codecpar->codec_id == AV_CODEC_ID_AC3 &&
                         ts->m2ts_mode) {
                 *q++ = 0xfd;
+            } else if (st->codecpar->codec_type == AVMEDIA_TYPE_DATA &&
+                       st->codecpar->codec_id == AV_CODEC_ID_TIMED_ID3) {
+                *q++ = 0xbd;
             } else if (st->codecpar->codec_type == AVMEDIA_TYPE_DATA) {
                 *q++ = stream_id != -1 ? stream_id : 0xfc;
 
@@ -1792,7 +1807,7 @@ static const AVOption options[] = {
       { .i64 = 0x0001 }, 0x0001, 0xffff, AV_OPT_FLAG_ENCODING_PARAM },
     { "mpegts_original_network_id", "Set original_network_id field.",
       offsetof(MpegTSWrite, original_network_id), AV_OPT_TYPE_INT,
-      { .i64 = 0x0001 }, 0x0001, 0xffff, AV_OPT_FLAG_ENCODING_PARAM },
+      { .i64 = DVB_PRIVATE_NETWORK_START }, 0x0001, 0xffff, AV_OPT_FLAG_ENCODING_PARAM },
     { "mpegts_service_id", "Set service_id field.",
       offsetof(MpegTSWrite, service_id), AV_OPT_TYPE_INT,
       { .i64 = 0x0001 }, 0x0001, 0xffff, AV_OPT_FLAG_ENCODING_PARAM },

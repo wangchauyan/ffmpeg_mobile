@@ -28,8 +28,8 @@
  */
 
 /**
- * @defgroup libavf I/O and Muxing/Demuxing Library
- * @{
+ * @defgroup libavf libavformat
+ * I/O and Muxing/Demuxing Library
  *
  * Libavformat (lavf) is a library for dealing with various media container
  * formats. Its main two purposes are demuxing - i.e. splitting a media file
@@ -89,6 +89,8 @@
  * Note that some schemes/protocols are quite powerful, allowing access to
  * both local and remote files, parts of them, concatenations of them, local
  * audio and video devices and so on.
+ *
+ * @{
  *
  * @defgroup lavf_decoding Demuxing
  * @{
@@ -203,15 +205,15 @@
  *   avio_open2() or a custom one.
  * - Unless the format is of the AVFMT_NOSTREAMS type, at least one stream must
  *   be created with the avformat_new_stream() function. The caller should fill
- *   the @ref AVStream.codec "stream codec context" information, such as the
- *   codec @ref AVCodecContext.codec_type "type", @ref AVCodecContext.codec_id
+ *   the @ref AVStream.codecpar "stream codec parameters" information, such as the
+ *   codec @ref AVCodecParameters.codec_type "type", @ref AVCodecParameters.codec_id
  *   "id" and other parameters (e.g. width / height, the pixel or sample format,
  *   etc.) as known. The @ref AVStream.time_base "stream timebase" should
  *   be set to the timebase that the caller desires to use for this stream (note
  *   that the timebase actually used by the muxer can be different, as will be
  *   described later).
  * - It is advised to manually initialize only the relevant fields in
- *   AVCodecContext, rather than using @ref avcodec_copy_context() during
+ *   AVCodecParameters, rather than using @ref avcodec_parameters_copy() during
  *   remuxing: there is no guarantee that the codec context values remain valid
  *   for both input and output format contexts.
  * - The caller may fill in additional information, such as @ref
@@ -527,7 +529,7 @@ typedef struct AVOutputFormat {
      * can use flags: AVFMT_NOFILE, AVFMT_NEEDNUMBER,
      * AVFMT_GLOBALHEADER, AVFMT_NOTIMESTAMPS, AVFMT_VARIABLE_FPS,
      * AVFMT_NODIMENSIONS, AVFMT_NOSTREAMS, AVFMT_ALLOW_FLUSH,
-     * AVFMT_TS_NONSTRICT
+     * AVFMT_TS_NONSTRICT, AVFMT_TS_NEGATIVE
      */
     int flags;
 
@@ -985,17 +987,6 @@ typedef struct AVStream {
     int event_flags;
 #define AVSTREAM_EVENT_FLAG_METADATA_UPDATED 0x0001 ///< The call resulted in updated metadata.
 
-    /*
-     * Codec parameters associated with this stream. Allocated and freed by
-     * libavformat in avformat_new_stream() and avformat_free_context()
-     * respectively.
-     *
-     * - demuxing: filled by libavformat on stream creation or in
-     *             avformat_find_stream_info()
-     * - muxing: filled by the caller before avformat_write_header()
-     */
-    AVCodecParameters *codecpar;
-
     /*****************************************************************
      * All fields below this line are not part of the public API. They
      * may not be used outside of libavformat and can be changed and
@@ -1217,6 +1208,17 @@ typedef struct AVStream {
      * Must not be accessed in any way by callers.
      */
     AVStreamInternal *internal;
+
+    /*
+     * Codec parameters associated with this stream. Allocated and freed by
+     * libavformat in avformat_new_stream() and avformat_free_context()
+     * respectively.
+     *
+     * - demuxing: filled by libavformat on stream creation or in
+     *             avformat_find_stream_info()
+     * - muxing: filled by the caller before avformat_write_header()
+     */
+    AVCodecParameters *codecpar;
 } AVStream;
 
 AVRational av_stream_get_r_frame_rate(const AVStream *s);
@@ -1305,6 +1307,12 @@ typedef struct AVFormatInternal AVFormatInternal;
  * version bump.
  * sizeof(AVFormatContext) must not be used outside libav*, use
  * avformat_alloc_context() to create an AVFormatContext.
+ *
+ * Fields can be accessed through AVOptions (av_opt*),
+ * the name string used matches the associated command line parameter name and
+ * can be found in libavformat/options_table.h.
+ * The AVOption/command line parameter names differ in some cases from the C
+ * structure field names for historic reasons or brevity.
  */
 typedef struct AVFormatContext {
     /**
@@ -2045,8 +2053,13 @@ uint8_t *av_stream_new_side_data(AVStream *stream,
  * @param size pointer for side information size to store (optional)
  * @return pointer to data if present or NULL otherwise
  */
+#if FF_API_NOCONST_GET_SIDE_DATA
 uint8_t *av_stream_get_side_data(AVStream *stream,
                                  enum AVPacketSideDataType type, int *size);
+#else
+uint8_t *av_stream_get_side_data(const AVStream *stream,
+                                 enum AVPacketSideDataType type, int *size);
+#endif
 
 AVProgram *av_new_program(AVFormatContext *s, int id);
 
@@ -2421,6 +2434,10 @@ int av_write_frame(AVFormatContext *s, AVPacket *pkt);
  * increasing dts. Callers doing their own interleaving should call
  * av_write_frame() instead of this function.
  *
+ * Using this function instead of av_write_frame() can give muxers advance
+ * knowledge of future packets, improving e.g. the behaviour of the mp4
+ * muxer for VFR content in fragmenting mode.
+ *
  * @param s media file handle
  * @param pkt The packet containing the data to be written.
  *            <br>
@@ -2708,6 +2725,9 @@ void av_dump_format(AVFormatContext *ic,
                     const char *url,
                     int is_output);
 
+
+#define AV_FRAME_FILENAME_FLAGS_MULTIPLE 1 ///< Allow multiple %d
+
 /**
  * Return in 'buf' the path with '%d' replaced by a number.
  *
@@ -2718,8 +2738,12 @@ void av_dump_format(AVFormatContext *ic,
  * @param buf_size destination buffer size
  * @param path numbered sequence string
  * @param number frame number
+ * @param flags AV_FRAME_FILENAME_FLAGS_*
  * @return 0 if OK, -1 on format error
  */
+int av_get_frame_filename2(char *buf, int buf_size,
+                          const char *path, int number, int flags);
+
 int av_get_frame_filename(char *buf, int buf_size,
                           const char *path, int number);
 
@@ -2863,8 +2887,11 @@ int avformat_queue_attached_pictures(AVFormatContext *s);
  * @return  >=0 on success;
  *          AVERROR code on failure
  */
+#if FF_API_OLD_BSF
+attribute_deprecated
 int av_apply_bitstream_filters(AVCodecContext *codec, AVPacket *pkt,
                                AVBitStreamFilterContext *bsfc);
+#endif
 
 /**
  * @}

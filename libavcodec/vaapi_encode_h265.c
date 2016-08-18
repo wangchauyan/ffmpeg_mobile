@@ -868,7 +868,10 @@ static int vaapi_encode_h265_init_sequence_params(AVCodecContext *avctx)
 
         vpic->pic_fields.bits.screen_content_flag = 0;
         vpic->pic_fields.bits.enable_gpu_weighted_prediction = 0;
-        vpic->pic_fields.bits.cu_qp_delta_enabled_flag = 1;
+
+        // Per-CU QP changes are required for non-constant-QP modes.
+        vpic->pic_fields.bits.cu_qp_delta_enabled_flag =
+            ctx->va_rc_mode != VA_RC_CQP;
     }
 
     {
@@ -1075,7 +1078,7 @@ static int vaapi_encode_h265_init_slice_params(AVCodecContext *avctx,
 
     av_assert0(pic->nb_refs <= 2);
     if (pic->nb_refs >= 1) {
-        // Backward reference for P or B frame.
+        // Backward reference for P- or B-frame.
         av_assert0(pic->type == PICTURE_TYPE_P ||
                    pic->type == PICTURE_TYPE_B);
 
@@ -1083,7 +1086,7 @@ static int vaapi_encode_h265_init_slice_params(AVCodecContext *avctx,
         vslice->ref_pic_list0[0] = vpic->reference_frames[0];
     }
     if (pic->nb_refs >= 2) {
-        // Forward reference for B frame.
+        // Forward reference for B-frame.
         av_assert0(pic->type == PICTURE_TYPE_B);
 
         vslice->num_ref_idx_l1_active_minus1 = 0;
@@ -1158,6 +1161,12 @@ static av_cold int vaapi_encode_h265_init_constant_bitrate(AVCodecContext *avctx
     int hrd_buffer_size;
     int hrd_initial_buffer_fullness;
 
+    if (avctx->bit_rate > INT32_MAX) {
+        av_log(avctx, AV_LOG_ERROR, "Target bitrate of 2^31 bps or "
+               "higher is not supported.\n");
+        return AVERROR(EINVAL);
+    }
+
     if (avctx->rc_buffer_size)
         hrd_buffer_size = avctx->rc_buffer_size;
     else
@@ -1196,7 +1205,7 @@ static av_cold int vaapi_encode_h265_init_constant_bitrate(AVCodecContext *avctx
     priv->fixed_qp_p   = 30;
     priv->fixed_qp_b   = 30;
 
-    av_log(avctx, AV_LOG_DEBUG, "Using constant-bitrate = %d bps.\n",
+    av_log(avctx, AV_LOG_DEBUG, "Using constant-bitrate = %"PRId64" bps.\n",
            avctx->bit_rate);
     return 0;
 }
@@ -1220,7 +1229,7 @@ static av_cold int vaapi_encode_h265_init_fixed_qp(AVCodecContext *avctx)
         priv->fixed_qp_b = priv->fixed_qp_p;
 
     av_log(avctx, AV_LOG_DEBUG, "Using fixed QP = "
-           "%d / %d / %d for IDR / P / B frames.\n",
+           "%d / %d / %d for IDR- / P- / B-frames.\n",
            priv->fixed_qp_idr, priv->fixed_qp_p, priv->fixed_qp_b);
     return 0;
 }
@@ -1321,7 +1330,7 @@ static av_cold int vaapi_encode_h265_init(AVCodecContext *avctx)
                    offsetof(VAAPIEncodeH265Options, x))
 #define FLAGS (AV_OPT_FLAG_VIDEO_PARAM | AV_OPT_FLAG_ENCODING_PARAM)
 static const AVOption vaapi_encode_h265_options[] = {
-    { "qp", "Constant QP (for P frames; scaled by qfactor/qoffset for I/B)",
+    { "qp", "Constant QP (for P-frames; scaled by qfactor/qoffset for I/B)",
       OFFSET(qp), AV_OPT_TYPE_INT, { .i64 = 25 }, 0, 52, FLAGS },
     { NULL },
 };
@@ -1332,10 +1341,10 @@ static const AVCodecDefault vaapi_encode_h265_defaults[] = {
     { "b",              "0"   },
     { "bf",             "2"   },
     { "g",              "120" },
-    { "i_qfactor",      "1.0" },
-    { "i_qoffset",      "0.0" },
-    { "b_qfactor",      "1.2" },
-    { "b_qoffset",      "0.0" },
+    { "i_qfactor",      "1"   },
+    { "i_qoffset",      "0"   },
+    { "b_qfactor",      "6/5" },
+    { "b_qoffset",      "0"   },
     { NULL },
 };
 

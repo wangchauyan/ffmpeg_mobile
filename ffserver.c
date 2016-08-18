@@ -3863,6 +3863,8 @@ drop:
             if (avformat_write_header(s, NULL) < 0) {
                 http_log("Container doesn't support the required parameters\n");
                 avio_closep(&s->pb);
+                s->streams = NULL;
+                s->nb_streams = 0;
                 avformat_free_context(s);
                 goto bail;
             }
@@ -3978,6 +3980,7 @@ int main(int argc, char **argv)
     int cfg_parsed;
     int ret = EXIT_FAILURE;
 
+    init_dynload();
 
     config.filename = av_strdup("/etc/ffserver.conf");
 

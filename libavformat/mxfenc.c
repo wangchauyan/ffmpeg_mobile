@@ -352,6 +352,7 @@ static const uint8_t multiple_desc_ul[]     = { 0x06,0x0E,0x2B,0x34,0x04,0x01,0x
 
 /**
  * SMPTE RP210 http://www.smpte-ra.org/mdd/index.html
+ *             https://smpte-ra.org/sites/default/files/Labels.xml
  */
 static const MXFLocalTagPair mxf_local_tag_batch[] = {
     // preface set
@@ -671,7 +672,7 @@ static uint64_t mxf_utf16len(const char *utf8_str)
             size += 2;
         continue;
 invalid:
-        av_log(NULL, AV_LOG_ERROR, "Invaid UTF8 sequence in mxf_utf16len\n\n");
+        av_log(NULL, AV_LOG_ERROR, "Invalid UTF8 sequence in mxf_utf16len\n\n");
     }
     size += 1;
     return size;
@@ -1496,7 +1497,7 @@ static void mxf_write_index_table_segment(AVFormatContext *s)
         for (i = 0; i < mxf->edit_units_count; i++) {
             int temporal_offset = 0;
 
-            if (!(mxf->index_entries[i].flags & 0x33)) { // I frame
+            if (!(mxf->index_entries[i].flags & 0x33)) { // I-frame
                 mxf->last_key_index = key_index;
                 key_index = i;
             }
@@ -1523,7 +1524,7 @@ static void mxf_write_index_table_segment(AVFormatContext *s)
                     mxf->last_key_index = key_index;
             }
 
-            if (!(mxf->index_entries[i].flags & 0x33) && // I frame
+            if (!(mxf->index_entries[i].flags & 0x33) && // I-frame
                 mxf->index_entries[i].flags & 0x40 && !temporal_offset)
                 mxf->index_entries[i].flags |= 0x80; // random access
             avio_w8(pb, mxf->index_entries[i].flags);
@@ -1822,6 +1823,7 @@ static const struct {
     int profile;
     uint8_t interlaced;
 } mxf_h264_codec_uls[] = {
+    {{ 0x06,0x0E,0x2B,0x34,0x04,0x01,0x01,0x0a,0x04,0x01,0x02,0x02,0x01,0x31,0x11,0x01 },      0,  66, 0 }, // AVC Baseline, Unconstrained Coding
     {{ 0x06,0x0E,0x2B,0x34,0x04,0x01,0x01,0x0a,0x04,0x01,0x02,0x02,0x01,0x32,0x20,0x01 },      0, 110, 0 }, // AVC High 10 Intra
     {{ 0x06,0x0E,0x2B,0x34,0x04,0x01,0x01,0x0a,0x04,0x01,0x02,0x02,0x01,0x32,0x21,0x01 }, 232960,   0, 1 }, // AVC Intra 50 1080i60
     {{ 0x06,0x0E,0x2B,0x34,0x04,0x01,0x01,0x0a,0x04,0x01,0x02,0x02,0x01,0x32,0x21,0x02 }, 281088,   0, 1 }, // AVC Intra 50 1080i50
@@ -1860,11 +1862,11 @@ static int mxf_parse_h264_frame(AVFormatContext *s, AVStream *st,
             break;
         --buf;
         switch (state & 0x1f) {
-        case NAL_SPS:
+        case H264_NAL_SPS:
             st->codecpar->profile = buf[1];
             e->flags |= 0x40;
             break;
-        case NAL_PPS:
+        case H264_NAL_PPS:
             if (e->flags & 0x40) { // sequence header present
                 e->flags |= 0x80; // random access
                 extra_size = 0;
@@ -1976,10 +1978,10 @@ static int mxf_parse_mpeg2_frame(AVFormatContext *s, AVStream *st,
         } else if (c == 0x100) { // pic
             int pict_type = (pkt->data[i+2]>>3) & 0x07;
             e->temporal_ref = (pkt->data[i+1]<<2) | (pkt->data[i+2]>>6);
-            if (pict_type == 2) { // P frame
+            if (pict_type == 2) { // P-frame
                 e->flags |= 0x22;
-                sc->closed_gop = 0; // reset closed gop, don't matter anymore
-            } else if (pict_type == 3) { // B frame
+                sc->closed_gop = 0; // reset closed GOP, don't matter anymore
+            } else if (pict_type == 3) { // B-frame
                 if (sc->closed_gop)
                     e->flags |= 0x13; // only backward prediction
                 else
@@ -2447,7 +2449,7 @@ static int mxf_write_packet(AVFormatContext *s, AVPacket *pkt)
     if (st->index == 0) {
         if (!mxf->edit_unit_byte_count &&
             (!mxf->edit_units_count || mxf->edit_units_count > EDIT_UNITS_PER_BODY) &&
-            !(ie.flags & 0x33)) { // I frame, Gop start
+            !(ie.flags & 0x33)) { // I-frame, GOP start
             mxf_write_klv_fill(s);
             if ((err = mxf_write_partition(s, 1, 2, body_partition_key, 0)) < 0)
                 return err;

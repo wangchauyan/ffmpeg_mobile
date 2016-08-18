@@ -193,7 +193,7 @@ DEF_CHOOSE_FORMAT(int, sample_rate, supported_samplerates, 0,
 DEF_CHOOSE_FORMAT(uint64_t, channel_layout, channel_layouts, 0,
                   GET_CH_LAYOUT_NAME)
 
-FilterGraph *init_simple_filtergraph(InputStream *ist, OutputStream *ost)
+int init_simple_filtergraph(InputStream *ist, OutputStream *ost)
 {
     FilterGraph *fg = av_mallocz(sizeof(*fg));
 
@@ -221,7 +221,7 @@ FilterGraph *init_simple_filtergraph(InputStream *ist, OutputStream *ost)
     GROW_ARRAY(filtergraphs, nb_filtergraphs);
     filtergraphs[nb_filtergraphs - 1] = fg;
 
-    return fg;
+    return 0;
 }
 
 static void init_input_filter(FilterGraph *fg, AVFilterInOut *in)
@@ -728,7 +728,8 @@ static int configure_input_video_filter(FilterGraph *fg, InputFilter *ifilter,
 
     if (ist->dec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
         av_log(NULL, AV_LOG_ERROR, "Cannot connect video filter to audio input\n");
-        return AVERROR(EINVAL);
+        ret = AVERROR(EINVAL);
+        goto fail;
     }
 
     if (!fr.num)
@@ -737,7 +738,7 @@ static int configure_input_video_filter(FilterGraph *fg, InputFilter *ifilter,
     if (ist->dec_ctx->codec_type == AVMEDIA_TYPE_SUBTITLE) {
         ret = sub2video_prepare(ist);
         if (ret < 0)
-            return ret;
+            goto fail;
     }
 
     sar = ist->st->sample_aspect_ratio.num ?
@@ -761,11 +762,11 @@ static int configure_input_video_filter(FilterGraph *fg, InputFilter *ifilter,
 
     if ((ret = avfilter_graph_create_filter(&ifilter->filter, buffer_filt, name,
                                             args.str, NULL, fg->graph)) < 0)
-        return ret;
+        goto fail;
     par->hw_frames_ctx = ist->hw_frames_ctx;
     ret = av_buffersrc_parameters_set(ifilter->filter, par);
     if (ret < 0)
-        return ret;
+        goto fail;
     av_freep(&par);
     last_filter = ifilter->filter;
 
@@ -840,6 +841,10 @@ static int configure_input_video_filter(FilterGraph *fg, InputFilter *ifilter,
     if ((ret = avfilter_link(last_filter, 0, in->filter_ctx, in->pad_idx)) < 0)
         return ret;
     return 0;
+fail:
+    av_freep(&par);
+
+    return ret;
 }
 
 static int configure_input_audio_filter(FilterGraph *fg, InputFilter *ifilter,
@@ -974,7 +979,7 @@ static int configure_input_filter(FilterGraph *fg, InputFilter *ifilter,
 int configure_filtergraph(FilterGraph *fg)
 {
     AVFilterInOut *inputs, *outputs, *cur;
-    int ret, i, simple = !fg->graph_desc;
+    int ret, i, simple = filtergraph_is_simple(fg);
     const char *graph_desc = simple ? fg->outputs[0]->ost->avfilter :
                                       fg->graph_desc;
 
@@ -1097,3 +1102,7 @@ int ist_in_filtergraph(FilterGraph *fg, InputStream *ist)
     return 0;
 }
 
+int filtergraph_is_simple(FilterGraph *fg)
+{
+    return !fg->graph_desc;
+}

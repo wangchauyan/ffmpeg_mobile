@@ -29,7 +29,9 @@
  */
 
 /**
- * @defgroup lavfi Libavfilter - graph-based frame editing library
+ * @defgroup lavfi libavfilter
+ * Graph-based frame editing library.
+ *
  * @{
  */
 
@@ -344,6 +346,13 @@ struct AVFilterContext {
      */
     AVFilterInternal *internal;
 
+    struct AVFilterCommand *command_queue;
+
+    char *enable_str;               ///< enable expression string
+    void *enable;                   ///< parsed expression (AVExpr*)
+    double *var_values;             ///< variable values for the enable expression
+    int is_disabled;                ///< the enabled state from the last expression evaluation
+
     /**
      * For filters which will create hardware frames, sets the device the
      * filter should create them in.  All other filters will ignore this field:
@@ -352,13 +361,6 @@ struct AVFilterContext {
      * hardware context information.
      */
     AVBufferRef *hw_device_ctx;
-
-    struct AVFilterCommand *command_queue;
-
-    char *enable_str;               ///< enable expression string
-    void *enable;                   ///< parsed expression (AVExpr*)
-    double *var_values;             ///< variable values for the enable expression
-    int is_disabled;                ///< the enabled state from the last expression evaluation
 };
 
 /**
@@ -474,12 +476,6 @@ struct AVFilterLink {
     AVRational frame_rate;
 
     /**
-     * For hwaccel pixel formats, this should be a reference to the
-     * AVHWFramesContext describing the frames.
-     */
-    AVBufferRef *hw_frames_ctx;
-
-    /**
      * Buffer partially filled with samples to achieve a fixed/minimum size.
      */
     AVFrame *partial_buf;
@@ -550,6 +546,12 @@ struct AVFilterLink {
      * cleared when a frame is filtered.
      */
     int frame_wanted_out;
+
+    /**
+     * For hwaccel pixel formats, this should be a reference to the
+     * AVHWFramesContext describing the frames.
+     */
+    AVBufferRef *hw_frames_ctx;
 };
 
 /**

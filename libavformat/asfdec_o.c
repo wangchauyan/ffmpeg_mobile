@@ -20,7 +20,6 @@
  */
 
 #include "libavutil/attributes.h"
-#include "libavutil/avassert.h"
 #include "libavutil/avstring.h"
 #include "libavutil/bswap.h"
 #include "libavutil/common.h"
@@ -122,8 +121,8 @@ typedef struct ASFContext {
 
     int stream_index; // from packet header, for the subpayload case
 
-    // packet parameteres
-    uint64_t sub_header_offset; // offset of subplayload header
+    // packet parameters
+    uint64_t sub_header_offset; // offset of subpayload header
     int64_t sub_dts;
     uint8_t dts_delta; // for subpayloads
     uint32_t packet_size_internal; // packet size stored inside ASFPacket, can be 0
@@ -829,7 +828,7 @@ static void set_language(AVFormatContext *s, const char *rfc1766, AVDictionary *
     // language abbr should contain at least 2 chars
     if (rfc1766 && strlen(rfc1766) > 1) {
         const char primary_tag[3] = { rfc1766[0], rfc1766[1], '\0' }; // ignore country code if any
-        const char *iso6392       = av_convert_lang_to(primary_tag,
+        const char *iso6392       = ff_convert_lang_to(primary_tag,
                                                        AV_LANG_ISO639_2_BIBL);
         if (iso6392)
             if (av_dict_set(met, "language", iso6392, 0) < 0)

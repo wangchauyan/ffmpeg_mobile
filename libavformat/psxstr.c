@@ -1,6 +1,6 @@
 /*
  * Sony Playstation (PSX) STR File Demuxer
- * Copyright (c) 2003 The FFmpeg Project
+ * Copyright (c) 2003 The FFmpeg project
  *
  * This file is part of FFmpeg.
  *
@@ -211,7 +211,7 @@ static int str_read_packet(AVFormatContext *s,
 
                 if(pkt->size != sector_count*VIDEO_DATA_CHUNK_SIZE){
                     if(pkt->data)
-                        av_log(s, AV_LOG_ERROR, "missmatching sector_count\n");
+                        av_log(s, AV_LOG_ERROR, "mismatching sector_count\n");
                     av_packet_unref(pkt);
                     if (av_new_packet(pkt, sector_count*VIDEO_DATA_CHUNK_SIZE))
                         return AVERROR(EIO);

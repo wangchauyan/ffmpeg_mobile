@@ -1389,10 +1389,9 @@ int attribute_align_arg avcodec_open2(AVCodecContext *avctx, const AVCodec *code
         avctx->thread_count = 1;
 
     if (avctx->codec->max_lowres < avctx->lowres || avctx->lowres < 0) {
-        av_log(avctx, AV_LOG_ERROR, "The maximum value for lowres supported by the decoder is %d\n",
+        av_log(avctx, AV_LOG_WARNING, "The maximum value for lowres supported by the decoder is %d\n",
                avctx->codec->max_lowres);
-        ret = AVERROR(EINVAL);
-        goto free_and_end;
+        avctx->lowres = avctx->codec->max_lowres;
     }
 
 #if FF_API_VISMV
@@ -1412,6 +1411,13 @@ FF_DISABLE_DEPRECATION_WARNINGS
         }
 FF_ENABLE_DEPRECATION_WARNINGS
 #endif
+
+        if (avctx->time_base.num <= 0 || avctx->time_base.den <= 0) {
+            av_log(avctx, AV_LOG_ERROR, "The encoder timebase is not set.\n");
+            ret = AVERROR(EINVAL);
+            goto free_and_end;
+        }
+
         if (avctx->codec->sample_fmts) {
             for (i = 0; avctx->codec->sample_fmts[i] != AV_SAMPLE_FMT_NONE; i++) {
                 if (avctx->sample_fmt == avctx->codec->sample_fmts[i])
@@ -2281,6 +2287,9 @@ int attribute_align_arg avcodec_decode_audio4(AVCodecContext *avctx,
 
     *got_frame_ptr = 0;
 
+    if (!avctx->codec)
+        return AVERROR(EINVAL);
+
     if (!avctx->codec->decode) {
         av_log(avctx, AV_LOG_ERROR, "This decoder requires using the avcodec_send_packet() API.\n");
         return AVERROR(ENOSYS);
@@ -2290,8 +2299,6 @@ int attribute_align_arg avcodec_decode_audio4(AVCodecContext *avctx,
         av_log(avctx, AV_LOG_ERROR, "invalid packet: NULL data, size != 0\n");
         return AVERROR(EINVAL);
     }
-    if (!avctx->codec)
-        return AVERROR(EINVAL);
     if (avctx->codec->type != AVMEDIA_TYPE_AUDIO) {
         av_log(avctx, AV_LOG_ERROR, "Invalid media type for audio\n");
         return AVERROR(EINVAL);
@@ -2345,7 +2352,7 @@ int attribute_align_arg avcodec_decode_audio4(AVCodecContext *avctx,
             skip_reason = AV_RL8(side + 8);
             discard_reason = AV_RL8(side + 9);
         }
-        if (avctx->internal->skip_samples && *got_frame_ptr &&
+        if (avctx->internal->skip_samples > 0 && *got_frame_ptr &&
             !(avctx->flags2 & AV_CODEC_FLAG2_SKIP_MANUAL)) {
             if(frame->nb_samples <= avctx->internal->skip_samples){
                 *got_frame_ptr = 0;
@@ -3251,6 +3258,10 @@ void avcodec_string(char *buf, int buf_size, AVCodecContext *enc, int encode)
             && enc->bits_per_raw_sample != av_get_bytes_per_sample(enc->sample_fmt) * 8)
             snprintf(buf + strlen(buf), buf_size - strlen(buf),
                      " (%d bit)", enc->bits_per_raw_sample);
+        if (enc->initial_padding || enc->trailing_padding) {
+            snprintf(buf + strlen(buf), buf_size - strlen(buf),
+                     ", delay %d, padding %d", enc->initial_padding, enc->trailing_padding);
+        }
         break;
     case AVMEDIA_TYPE_DATA:
         if (av_log_get_level() >= AV_LOG_DEBUG) {
@@ -3600,6 +3611,8 @@ static int get_audio_frame_duration(enum AVCodecID id, int sr, int ch, int ba,
                     return blocks * ((ba - 4 * ch) * 2 / ch);
                 case AV_CODEC_ID_ADPCM_MS:
                     return blocks * (2 + (ba - 7 * ch) * 2 / ch);
+                case AV_CODEC_ID_ADPCM_MTAF:
+                    return blocks * (ba - 16) * 2 / ch;
                 }
             }
 
@@ -4094,14 +4107,15 @@ int avcodec_parameters_from_context(AVCodecParameters *par,
         par->video_delay         = codec->has_b_frames;
         break;
     case AVMEDIA_TYPE_AUDIO:
-        par->format          = codec->sample_fmt;
-        par->channel_layout  = codec->channel_layout;
-        par->channels        = codec->channels;
-        par->sample_rate     = codec->sample_rate;
-        par->block_align     = codec->block_align;
-        par->frame_size      = codec->frame_size;
-        par->initial_padding = codec->initial_padding;
-        par->seek_preroll    = codec->seek_preroll;
+        par->format           = codec->sample_fmt;
+        par->channel_layout   = codec->channel_layout;
+        par->channels         = codec->channels;
+        par->sample_rate      = codec->sample_rate;
+        par->block_align      = codec->block_align;
+        par->frame_size       = codec->frame_size;
+        par->initial_padding  = codec->initial_padding;
+        par->trailing_padding = codec->trailing_padding;
+        par->seek_preroll     = codec->seek_preroll;
         break;
     case AVMEDIA_TYPE_SUBTITLE:
         par->width  = codec->width;
@@ -4148,14 +4162,16 @@ int avcodec_parameters_to_context(AVCodecContext *codec,
         codec->has_b_frames           = par->video_delay;
         break;
     case AVMEDIA_TYPE_AUDIO:
-        codec->sample_fmt      = par->format;
-        codec->channel_layout  = par->channel_layout;
-        codec->channels        = par->channels;
-        codec->sample_rate     = par->sample_rate;
-        codec->block_align     = par->block_align;
-        codec->frame_size      = par->frame_size;
-        codec->initial_padding = par->initial_padding;
-        codec->seek_preroll    = par->seek_preroll;
+        codec->sample_fmt       = par->format;
+        codec->channel_layout   = par->channel_layout;
+        codec->channels         = par->channels;
+        codec->sample_rate      = par->sample_rate;
+        codec->block_align      = par->block_align;
+        codec->frame_size       = par->frame_size;
+        codec->delay            =
+        codec->initial_padding  = par->initial_padding;
+        codec->trailing_padding = par->trailing_padding;
+        codec->seek_preroll     = par->seek_preroll;
         break;
     case AVMEDIA_TYPE_SUBTITLE:
         codec->width  = par->width;
@@ -4171,6 +4187,49 @@ int avcodec_parameters_to_context(AVCodecContext *codec,
         memcpy(codec->extradata, par->extradata, par->extradata_size);
         codec->extradata_size = par->extradata_size;
     }
+
+    return 0;
+}
+
+int ff_alloc_a53_sei(const AVFrame *frame, size_t prefix_len,
+                     void **data, size_t *sei_size)
+{
+    AVFrameSideData *side_data = NULL;
+    uint8_t *sei_data;
+
+    if (frame)
+        side_data = av_frame_get_side_data(frame, AV_FRAME_DATA_A53_CC);
+
+    if (!side_data) {
+        *data = NULL;
+        return 0;
+    }
+
+    *sei_size = side_data->size + 11;
+    *data = av_mallocz(*sei_size + prefix_len);
+    if (!*data)
+        return AVERROR(ENOMEM);
+    sei_data = (uint8_t*)*data + prefix_len;
+
+    // country code
+    sei_data[0] = 181;
+    sei_data[1] = 0;
+    sei_data[2] = 49;
+
+    /**
+     * 'GA94' is standard in North America for ATSC, but hard coding
+     * this style may not be the right thing to do -- other formats
+     * do exist. This information is not available in the side_data
+     * so we are going with this right now.
+     */
+    AV_WL32(sei_data + 3, MKTAG('G', 'A', '9', '4'));
+    sei_data[7] = 3;
+    sei_data[8] = ((side_data->size/3) & 0x1f) | 0x40;
+    sei_data[9] = 0;
+
+    memcpy(sei_data + 10, side_data->data, side_data->size);
+
+    sei_data[side_data->size+10] = 255;
 
     return 0;
 }

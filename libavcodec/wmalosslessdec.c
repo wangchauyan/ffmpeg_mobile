@@ -105,8 +105,8 @@ typedef struct WmallDecodeCtx {
     uint32_t        frame_num;                      ///< current frame number (not used for decoding)
     GetBitContext   gb;                             ///< bitstream reader context
     int             buf_bit_size;                   ///< buffer size in bits
-    int16_t         *samples_16[WMALL_MAX_CHANNELS]; ///< current samplebuffer pointer (16-bit)
-    int32_t         *samples_32[WMALL_MAX_CHANNELS]; ///< current samplebuffer pointer (24-bit)
+    int16_t         *samples_16[WMALL_MAX_CHANNELS]; ///< current sample buffer pointer (16-bit)
+    int32_t         *samples_32[WMALL_MAX_CHANNELS]; ///< current sample buffer pointer (24-bit)
     uint8_t         drc_gain;                       ///< gain for the DRC tool
     int8_t          skip_frame;                     ///< skip output step
     int8_t          parsed_all_subframes;           ///< all subframes decoded?
@@ -674,10 +674,10 @@ static void mclms_predict(WmallDecodeCtx *s, int icoef, int *pred)
         if (!s->is_channel_coded[ich])
             continue;
         for (i = 0; i < order * num_channels; i++)
-            pred[ich] += s->mclms_prevvalues[i + s->mclms_recent] *
+            pred[ich] += (uint32_t)s->mclms_prevvalues[i + s->mclms_recent] *
                          s->mclms_coeffs[i + order * num_channels * ich];
         for (i = 0; i < ich; i++)
-            pred[ich] += s->channel_residues[i][icoef] *
+            pred[ich] += (uint32_t)s->channel_residues[i][icoef] *
                          s->mclms_coeffs_cur[i + num_channels * ich];
         pred[ich] += 1 << s->mclms_scaling - 1;
         pred[ich] >>= s->mclms_scaling;
@@ -822,7 +822,7 @@ static void revert_acfilter(WmallDecodeCtx *s, int tile_size)
         for (i = order; i < tile_size; i++) {
             pred = 0;
             for (j = 0; j < order; j++)
-                pred += s->channel_residues[ich][i - j - 1] * filter_coeffs[j];
+                pred += (uint32_t)s->channel_residues[ich][i - j - 1] * filter_coeffs[j];
             pred >>= scaling;
             s->channel_residues[ich][i] += pred;
         }
@@ -1200,7 +1200,7 @@ static int decode_packet(AVCodecContext *avctx, void *data, int *got_frame_ptr,
         /* parse packet header */
         init_get_bits(gb, buf, s->buf_bit_size);
         packet_sequence_number = get_bits(gb, 4);
-        skip_bits(gb, 1);   // Skip seekable_frame_in_packet, currently ununused
+        skip_bits(gb, 1);   // Skip seekable_frame_in_packet, currently unused
         spliced_packet = get_bits1(gb);
         if (spliced_packet)
             avpriv_request_sample(avctx, "Bitstream splicing");

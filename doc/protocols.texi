@@ -276,7 +276,7 @@ value is -1.
 If set to 1 use chunked Transfer-Encoding for posts, default is 1.
 
 @item content_type
-Set a specific content type for the POST messages.
+Set a specific content type for the POST messages or for listen mode.
 
 @item http_proxy
 set HTTP proxy to tunnel through e.g. http://example.com:1234
@@ -695,7 +695,7 @@ This protocol accepts the following options.
 
 @table @option
 @item timeout
-Set timeout in miliseconds of socket I/O operations used by the underlying
+Set timeout in milliseconds of socket I/O operations used by the underlying
 low level operation. By default it is set to -1, which means that the timeout
 is not specified.
 
@@ -1159,6 +1159,15 @@ Play an AVI file directly from a TAR archive:
 subfile,,start,183241728,end,366490624,,:archive.tar
 @end example
 
+@section tee
+
+Writes the output to multiple protocols. The individual outputs are separated
+by |
+
+@example
+tee:file://path/to/local/this.avi|file://path/to/local/that.avi
+@end example
+
 @section tcp
 
 Transmission Control Protocol.
@@ -1284,6 +1293,14 @@ The list of supported options follows.
 Set the UDP maximum socket buffer size in bytes. This is used to set either
 the receive or send buffer size, depending on what the socket is used for.
 Default is 64KB.  See also @var{fifo_size}.
+
+@item bitrate=@var{bitrate}
+If set to nonzero, the output will have the specified constant bitrate if the
+input has enough packets to sustain it.
+
+@item burst_bits=@var{bits}
+When using @var{bitrate} this specifies the maximum number of bits in
+packet bursts.
 
 @item localport=@var{port}
 Override the local UDP port to bind with.

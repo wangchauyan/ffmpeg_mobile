@@ -715,11 +715,8 @@ static int v4l2_set_parameters(AVFormatContext *ctx)
     streamparm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (v4l2_ioctl(s->fd, VIDIOC_G_PARM, &streamparm) < 0) {
         ret = AVERROR(errno);
-        av_log(ctx, AV_LOG_ERROR, "ioctl(VIDIOC_G_PARM): %s\n", av_err2str(ret));
-        return ret;
-    }
-
-    if (framerate_q.num && framerate_q.den) {
+        av_log(ctx, AV_LOG_WARNING, "ioctl(VIDIOC_G_PARM): %s\n", av_err2str(ret));
+    } else if (framerate_q.num && framerate_q.den) {
         if (streamparm.parm.capture.capability & V4L2_CAP_TIMEPERFRAME) {
             tpf = &streamparm.parm.capture.timeperframe;
 
@@ -974,9 +971,9 @@ fail:
 
 static int v4l2_read_packet(AVFormatContext *ctx, AVPacket *pkt)
 {
-    struct video_data *s = ctx->priv_data;
-#if FF_API_CODED_FRAME
+#if FF_API_CODED_FRAME && FF_API_LAVF_AVCTX
 FF_DISABLE_DEPRECATION_WARNINGS
+    struct video_data *s = ctx->priv_data;
     AVFrame *frame = ctx->streams[0]->codec->coded_frame;
 FF_ENABLE_DEPRECATION_WARNINGS
 #endif
@@ -987,7 +984,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
         return res;
     }
 
-#if FF_API_CODED_FRAME
+#if FF_API_CODED_FRAME && FF_API_LAVF_AVCTX
 FF_DISABLE_DEPRECATION_WARNINGS
     if (frame && s->interlaced) {
         frame->interlaced_frame = 1;

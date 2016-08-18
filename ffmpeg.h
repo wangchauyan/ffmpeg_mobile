@@ -66,6 +66,7 @@ enum HWAccelID {
     HWACCEL_VIDEOTOOLBOX,
     HWACCEL_QSV,
     HWACCEL_VAAPI,
+    HWACCEL_CUVID,
 };
 
 typedef struct HWAccel {
@@ -572,7 +573,8 @@ void choose_sample_fmt(AVStream *st, AVCodec *codec);
 int configure_filtergraph(FilterGraph *fg);
 int configure_output_filter(FilterGraph *fg, OutputFilter *ofilter, AVFilterInOut *out);
 int ist_in_filtergraph(FilterGraph *fg, InputStream *ist);
-FilterGraph *init_simple_filtergraph(InputStream *ist, OutputStream *ost);
+int filtergraph_is_simple(FilterGraph *fg);
+int init_simple_filtergraph(InputStream *ist, OutputStream *ost);
 int init_complex_filtergraph(FilterGraph *fg);
 
 int ffmpeg_parse_options(int argc, char **argv);
@@ -585,5 +587,7 @@ int qsv_init(AVCodecContext *s);
 int qsv_transcode_init(OutputStream *ost);
 int vaapi_decode_init(AVCodecContext *avctx);
 int vaapi_device_init(const char *device);
+int cuvid_init(AVCodecContext *s);
+int cuvid_transcode_init(OutputStream *ost);
 
 #endif /* FFMPEG_H */

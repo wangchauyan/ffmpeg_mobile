@@ -27,7 +27,14 @@ fate-vsynth%-cljr:               ENCOPTS = -strict -1
 
 FATE_VCODEC-$(call ENCDEC, DNXHD, DNXHD) += dnxhd-720p                  \
                                             dnxhd-720p-rd               \
-                                            dnxhd-720p-10bit
+                                            dnxhd-720p-10bit            \
+                                            dnxhd-720p-hr-lb            \
+                                            dnxhd-4k-hr-lb              \
+                                            dnxhd-uhd-hr-sq             \
+                                            dnxhd-2k-hr-hq              \
+                                            dnxhd-edge1-hr              \
+                                            dnxhd-edge2-hr              \
+                                            dnxhd-edge3-hr
 
 FATE_VCODEC-$(call ENCDEC, VC2 DIRAC, MOV) += vc2-420p vc2-420p10 vc2-420p12 \
                                               vc2-422p vc2-422p10 vc2-422p12 \
@@ -53,6 +60,41 @@ fate-vsynth%-dnxhd-720p-rd:      FMT     = dnxhd
 fate-vsynth%-dnxhd-720p-10bit:   ENCOPTS = -s hd720 -b 90M              \
                                            -pix_fmt yuv422p10 -frames 5 -qmax 8
 fate-vsynth%-dnxhd-720p-10bit:   FMT     = dnxhd
+
+fate-vsynth%-dnxhd-720p-hr-lb: ENCOPTS   = -s hd720 -profile:v dnxhr_lb \
+                                           -pix_fmt yuv422p -frames 5
+fate-vsynth%-dnxhd-720p-hr-lb: DECOPTS    = -sws_flags area+accurate_rnd+bitexact
+fate-vsynth%-dnxhd-720p-hr-lb: FMT       = dnxhd
+
+fate-vsynth%-dnxhd-4k-hr-lb:  ENCOPTS    = -s 4k -profile:v dnxhr_lb \
+                                           -pix_fmt yuv422p -frames 5
+fate-vsynth%-dnxhd-4k-hr-lb:  DECOPTS    = -sws_flags area+accurate_rnd+bitexact
+fate-vsynth%-dnxhd-4k-hr-lb:  FMT        = dnxhd
+
+fate-vsynth%-dnxhd-uhd-hr-sq: ENCOPTS    = -s uhd2160 -profile:v dnxhr_sq \
+                                           -pix_fmt yuv422p -frames 5
+fate-vsynth%-dnxhd-uhd-hr-sq: DECOPTS    = -sws_flags area+accurate_rnd+bitexact
+fate-vsynth%-dnxhd-uhd-hr-sq: FMT        = dnxhd
+
+fate-vsynth%-dnxhd-2k-hr-hq:  ENCOPTS    = -s 2k -profile:v dnxhr_hq \
+                                         -pix_fmt yuv422p -frames 5
+fate-vsynth%-dnxhd-2k-hr-hq:  DECOPTS    = -sws_flags area+accurate_rnd+bitexact
+fate-vsynth%-dnxhd-2k-hr-hq:  FMT        = dnxhd
+
+fate-vsynth%-dnxhd-edge1-hr:  ENCOPTS    = -s 264x128 -profile:v dnxhr_hq \
+                                           -pix_fmt yuv422p -frames 5
+fate-vsynth%-dnxhd-edge1-hr:  DECOPTS    = -sws_flags area+accurate_rnd+bitexact
+fate-vsynth%-dnxhd-edge1-hr:  FMT        = dnxhd
+
+fate-vsynth%-dnxhd-edge2-hr:  ENCOPTS    = -s 271x135 -profile:v dnxhr_hq \
+                                           -pix_fmt yuv422p -frames 5
+fate-vsynth%-dnxhd-edge2-hr:  DECOPTS    = -sws_flags area+accurate_rnd+bitexact
+fate-vsynth%-dnxhd-edge2-hr:  FMT        = dnxhd
+
+fate-vsynth%-dnxhd-edge3-hr:  ENCOPTS    = -s 257x121 -profile:v dnxhr_hq \
+                                           -pix_fmt yuv422p -frames 5
+fate-vsynth%-dnxhd-edge3-hr:  DECOPTS    = -sws_flags area+accurate_rnd+bitexact
+fate-vsynth%-dnxhd-edge3-hr:  FMT        = dnxhd
 
 FATE_VCODEC-$(call ENCDEC, DNXHD, MOV)  += dnxhd-1080i dnxhd-1080i-10bit dnxhd-1080i-colr
 fate-vsynth%-dnxhd-1080i:        ENCOPTS = -s hd1080 -b 120M -flags +ildct \
@@ -88,7 +130,7 @@ fate-vsynth%-dv-50:              FMT     = dv
 
 FATE_VCODEC-$(call ENCDEC, FFV1, AVI)   += ffv1 ffv1-v0 \
                                            ffv1-v3-yuv420p ffv1-v3-yuv422p10 ffv1-v3-yuv444p16 \
-                                           ffv1-v3-bgr0
+                                           ffv1-v3-bgr0 ffv1-v3-rgb48
 fate-vsynth%-ffv1:               ENCOPTS = -slices 4
 fate-vsynth%-ffv1-v0:            CODEC   = ffv1
 fate-vsynth%-ffv1-v3-yuv420p:    ENCOPTS = -level 3 -pix_fmt yuv420p
@@ -101,6 +143,9 @@ fate-vsynth%-ffv1-v3-yuv444p16:  DECOPTS = -sws_flags neighbor+bitexact
 fate-vsynth%-ffv1-v3-bgr0:       ENCOPTS = -level 3 -pix_fmt bgr0 \
                                            -sws_flags neighbor+bitexact
 fate-vsynth%-ffv1-v3-bgr0:       DECOPTS = -sws_flags neighbor+bitexact
+fate-vsynth%-ffv1-v3-rgb48:      ENCOPTS = -level 3 -pix_fmt rgb48 -strict -2 \
+                                           -sws_flags neighbor+bitexact
+fate-vsynth%-ffv1-v3-rgb48:      DECOPTS = -sws_flags neighbor+bitexact
 
 FATE_VCODEC-$(call ENCDEC, FFVHUFF, AVI) += ffvhuff ffvhuff444 ffvhuff420p12 ffvhuff422p10left ffvhuff444p16
 fate-vsynth%-ffvhuff444:         ENCOPTS = -vcodec ffvhuff -pix_fmt yuv444p

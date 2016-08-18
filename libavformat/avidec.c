@@ -670,7 +670,7 @@ static int avi_read_header(AVFormatContext *s)
                 av_log(s, AV_LOG_ERROR, "crazy start time, iam scared, giving up\n");
                 ast->cum_len = 0;
             }
-            ast->sample_size = avio_rl32(pb); /* sample ssize */
+            ast->sample_size = avio_rl32(pb);
             ast->cum_len    *= FFMAX(1, ast->sample_size);
             av_log(s, AV_LOG_TRACE, "%"PRIu32" %"PRIu32" %d\n",
                     ast->rate, ast->scale, ast->sample_size);
@@ -1698,6 +1698,8 @@ static int guess_ni_flag(AVFormatContext *s)
             avio_rl16(s->pb);
             size = avio_rl32(s->pb);
             if (get_stream_idx(tag) == i && pos + size > st->index_entries[1].pos)
+                last_start = INT64_MAX;
+            if (get_stream_idx(tag) == i && size == st->index_entries[0].size + 8)
                 last_start = INT64_MAX;
         }
 

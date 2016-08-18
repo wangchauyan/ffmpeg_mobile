@@ -1,23 +1,49 @@
-# ffmpeg for mobile platforms 
+FFmpeg README
+=============
 
-ffmpeg_mobile is a repository for building ffmpeg library on Android & iOS platforms. 
+FFmpeg is a collection of libraries and tools to process multimedia content
+such as audio, video, subtitles and related metadata.
 
-### Android platform
-Please check the following steps to modify the build-Android.sh 
+## Libraries
 
-> 1. mark sure you download the ndk from http://developer.android.com/intl/zh-tw/ndk/downloads/index.html
-> 2. The latest version is r11c, but I use r10 to build ffmpeg (3.0, the latest code). I haven't test r11c for buidling latest ffmpeg code. So, if you can't build that, please let me know.
-> 3. Download the ndk lib and extract to Android SDK path. 
-> 4. Now, make sure you remember the ndk lib path and try to run ./nkd-build to see if you setup already. 
+* `libavcodec` provides implementation of a wider range of codecs.
+* `libavformat` implements streaming protocols, container formats and basic I/O access.
+* `libavutil` includes hashers, decompressors and miscellaneous utility functions.
+* `libavfilter` provides a mean to alter decoded Audio and Video through chain of filters.
+* `libavdevice` provides an abstraction to access capture and playback devices.
+* `libswresample` implements audio mixing and resampling routines.
+* `libswscale` implements color conversion and scaling routines.
 
-After finishing setup everything, now open the build-Android.sh. You will need to modify some parts of this file. 
+## Tools
 
-> 1. modify export NDK line, change to your ndk lib path. 
-> 2. I build on my MBPR, so I will use "darwin-x86_64", but if you use linux system, please change this to linux-x86_64. Or you will build failed. 
+* [ffmpeg](https://ffmpeg.org/ffmpeg.html) is a command line toolbox to
+  manipulate, convert and stream multimedia content.
+* [ffplay](https://ffmpeg.org/ffplay.html) is a minimalistic multimedia player.
+* [ffprobe](https://ffmpeg.org/ffprobe.html) is a simple analysis tool to inspect
+  multimedia content.
+* [ffserver](https://ffmpeg.org/ffserver.html) is a multimedia streaming server
+  for live broadcasts.
+* Additional small tools such as `aviocat`, `ismindex` and `qt-faststart`.
 
-### iOS platform 
-> 1. copy gas-preprocessor.pl to /usr/sbin, and change execute permission as 777. chmod 777 /usr/sbin/gas-preprocessor.ph
-> 2. Install yasm, brew install yasm. 
-> 3. check if yasm works. yasm --version 
-> 4. run build-iOS.sh script, it will build all versions on iOS.
-> 5. if you wanna integrate with ffmpeg, add 3 frameworks into project, libz.lib, libbz2.lib, libiconv.lib 
+## Documentation
+
+The offline documentation is available in the **doc/** directory.
+
+The online documentation is available in the main [website](https://ffmpeg.org)
+and in the [wiki](https://trac.ffmpeg.org).
+
+### Examples
+
+Coding examples are available in the **doc/examples** directory.
+
+## License
+
+FFmpeg codebase is mainly LGPL-licensed with optional components licensed under
+GPL. Please refer to the LICENSE file for detailed information.
+
+## Contributing
+
+Patches should be submitted to the ffmpeg-devel mailing list using
+`git format-patch` or `git send-email`. Github pull requests should be
+avoided because they are not part of our review process. Few developers
+follow pull requests so they will likely be ignored.
